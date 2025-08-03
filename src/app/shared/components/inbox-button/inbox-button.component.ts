@@ -1,8 +1,9 @@
 import { AfterViewInit, Component, input, signal } from '@angular/core';
-import { IonButton, IonIcon, IonAccordion } from '@ionic/angular/standalone';
+import { IonButton, IonIcon, IonAccordion, ModalController } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
 import { notificationsOutline } from 'ionicons/icons';
 import anime, { AnimeInstance } from 'animejs';
+import { InboxComponent } from '@components/inbox/inbox.component';
 
 @Component({
   selector: 'app-inbox-button',
@@ -45,12 +46,16 @@ export class InboxButtonComponent implements AfterViewInit {
   unreadMessages = signal(false);
   private shakeAnimation?: AnimeInstance;
 
-  constructor() {
+  constructor(private modalController: ModalController) {
     addIcons({ notificationsOutline });
   }
 
-  showInbox(): void {
+  async showInbox(): Promise<void> {
     // TODO: Show Inbox component in Modal when tapping Bell icon
+    const modal = await this.modalController.create({
+        component: InboxComponent,
+      });
+      await modal.present();
   }
 
   // TODO: When receiving/reading new Braze inbox message, update notification state.
