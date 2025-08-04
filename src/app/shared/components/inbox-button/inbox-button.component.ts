@@ -1,9 +1,10 @@
-import { AfterViewInit, Component, input, signal } from '@angular/core';
+import { AfterViewInit, Component, input, inject, effect } from '@angular/core';
 import { IonButton, IonIcon, IonAccordion, ModalController } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
 import { notificationsOutline } from 'ionicons/icons';
 import anime, { AnimeInstance } from 'animejs';
 import { InboxComponent } from '@components/inbox/inbox.component';
+import { InboxService } from '@services/inbox.service';
 
 @Component({
   selector: 'app-inbox-button',
@@ -43,25 +44,36 @@ import { InboxComponent } from '@components/inbox/inbox.component';
 })
 export class InboxButtonComponent implements AfterViewInit {
   readonly slot = input<IonAccordion['toggleIconSlot']>();
-  unreadMessages = signal(false);
+  
+  private readonly modalController = inject(ModalController);
+  private readonly inboxService = inject(InboxService);
+  
+  // Use the inbox service's unread count
+  unreadMessages = this.inboxService.unreadCount;
   private shakeAnimation?: AnimeInstance;
 
-  constructor(private modalController: ModalController) {
+  constructor() {
     addIcons({ notificationsOutline });
+    
+    // Effect to trigger shake animation when unread count changes
+    effect(() => {
+      const unreadCount = this.unreadMessages();
+      if (unreadCount > 0 && this.shakeAnimation) {
+        this.shakeAnimation.restart();
+      }
+    });
   }
 
   async showInbox(): Promise<void> {
-    // TODO: Show Inbox component in Modal when tapping Bell icon
-    const modal = await this.modalController.create({
+    try {
+      const modal = await this.modalController.create({
         component: InboxComponent,
       });
       await modal.present();
+    } catch (error) {
+      console.error('Error showing inbox:', error);
+    }
   }
-
-  // TODO: When receiving/reading new Braze inbox message, update notification state.
-  // Icon should play the shake animation when new unread messages are received.
-  //   this.unreadMessages = true;
-  //   this.shakeAnimation?.restart();
 
   ngAfterViewInit(): void {
     this.shakeAnimation = anime({

@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { IonApp, IonRouterOutlet } from '@ionic/angular/standalone';
 import { PushNotificationService } from '@services/push-notification.service';
 
@@ -8,8 +8,11 @@ import { PushNotificationService } from '@services/push-notification.service';
   standalone: true,
   imports: [IonApp, IonRouterOutlet]
 })
-export class AppComponent {
-  constructor(private pushNotificationService: PushNotificationService) {
-    this.pushNotificationService.init();
+export class AppComponent implements OnInit {
+  constructor(private pushNotificationService: PushNotificationService) {}
+
+  async ngOnInit(): Promise<void> {
+    // Initialize push notifications and Braze integration
+    await this.pushNotificationService.init();
   }
 }

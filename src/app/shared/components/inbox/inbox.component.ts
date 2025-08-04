@@ -1,16 +1,9 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { AlertController, ModalController, IonHeader, IonToolbar, IonTitle, IonContent, IonButton, IonIcon } from '@ionic/angular/standalone';
 import { MmCardComponent } from '../mm-card/mm-card.component';
-
-interface InboxCard {
-    id: string;
-    title: string;
-    message: string;
-    timestamp: string;
-    icon: string;
-    iconBackground: string;
-}
+import { InboxService } from '@services/inbox.service';
+import { BrazeService, BrazeContentCard } from '@services/braze.service';
 
 @Component({
     selector: 'app-inbox',
@@ -27,22 +20,25 @@ interface InboxCard {
 
         <ion-content>
             <div class="inbox-container">
-                <app-mm-card *ngFor="let card of inboxCards" [title]="card.title" [showIcon]="true">
-                    <div class="inbox-card" (click)="onCardClick(card)">
-                        <div class="card-content">
-                            <div class="card-icon" [style.background-color]="card.iconBackground">
-                                <ion-icon [name]="card.icon"></ion-icon>
-                            </div>
-                            <div class="card-details">
-                                <p class="card-message">{{ card.message }}</p>
-                                <span class="card-timestamp">{{ card.timestamp }}</span>
-                            </div>
-                        </div>
-                        <ion-button fill="clear" class="delete-button" (click)="dismissCard(card); $event.stopPropagation()">
-                            <ion-icon name="close-circle" color="danger"></ion-icon>
-                        </ion-button>
+                @if (inboxCards().length === 0) {
+                    <div class="empty-state">
+                        <p>You're all caught up! No new notifications.</p>
                     </div>
-                </app-mm-card>
+                } @else {
+                    <app-mm-card *ngFor="let card of inboxCards()" [title]="card.title || 'Notification'" [showIcon]="true">
+                        <div class="inbox-card" (click)="onCardClick(card)">
+                            <div class="card-content">
+                                <div class="card-details">
+                                    <p class="card-message">{{ card.cardDescription || 'No description available' }}</p>
+                                    <span class="card-timestamp">{{ formatDate(card.created) }}</span>
+                                </div>
+                            </div>
+                            <ion-button fill="clear" class="delete-button" (click)="dismissCard(card); $event.stopPropagation()">
+                                <ion-icon name="close-circle" color="danger"></ion-icon>
+                            </ion-button>
+                        </div>
+                    </app-mm-card>
+                }
             </div>
         </ion-content>
     `,
@@ -54,45 +50,78 @@ interface InboxCard {
         ion-button {
             font-size: 1.5rem;
         }
+
+        .empty-state {
+            text-align: center;
+            padding: 2rem;
+            color: var(--ion-color-medium);
+        }
+
+        .inbox-card {
+            display: flex;
+            align-items: center;
+            padding: 1rem;
+            cursor: pointer;
+        }
+
+        .card-content {
+            flex: 1;
+        }
+
+        .card-message {
+            margin: 0 0 0.5rem 0;
+            color: var(--ion-color-dark);
+        }
+
+        .card-timestamp {
+            font-size: 0.8rem;
+            color: var(--ion-color-medium);
+        }
+
+        .delete-button {
+            margin-left: 1rem;
+        }
     `],
     standalone: true,
     imports: [CommonModule, IonHeader, IonToolbar, IonTitle, IonContent, IonButton, IonIcon, MmCardComponent]
 })
 export class InboxComponent implements OnInit {
-    inboxCards: InboxCard[] = [
-        {
-            id: '1',
-            title: 'Transaction Success',
-            message: 'Success! Your order of R1000 to Jack Harlow has been successfully processed.',
-            timestamp: '28.10.2022 04:58',
-            icon: 'checkmark-circle',
-            iconBackground: '#10B981'
-        },
-        {
-            id: '2',
-            title: 'Activate Banking',
-            message: 'You qualify for banking with Mama Money',
-            timestamp: '28.10.2022 04:58',
-            icon: 'card',
-            iconBackground: '#3B82F6'
-        }
-    ];
+    private readonly modalController = inject(ModalController);
+    private readonly alertController = inject(AlertController);
+    private readonly inboxService = inject(InboxService);
+    private readonly brazeService = inject(BrazeService);
 
-    constructor(private modalController: ModalController, private alertController: AlertController) { }
+    // Use inbox service signals
+    inboxCards = this.inboxService.cards;
 
     ngOnInit() {
-        // TODO: load content cards using Braze
+        // Cards are already loaded through the InboxButtonComponent
     }
 
-    openCard() {
-        // TODO: Implement card opening logic
+    async onCardClick(card: BrazeContentCard) {        
+        // Mark as viewed in the service
+        this.inboxService.markAsViewed(card.id);
+        
+        // Log impression to Braze
+        try {
+            await this.brazeService.logContentCardImpression(card.id);
+            
+            // If card has URL, handle click
+            if (card.url) {
+                await this.brazeService.logContentCardClicked(card.id);
+                // You can add navigation logic here if needed
+                console.log('Would navigate to:', card.url);
+            }
+        } catch (error) {
+            console.error('Error logging card interaction:', error);
+        }
     }
 
     confirmDismissModal() {
         this.modalController.dismiss();
     }
 
-    async dismissCard(card: InboxCard) {
+    async dismissCard(card: BrazeContentCard) {
         const alert = await this.alertController.create({
             header: 'Delete Message',
             message: 'Are you sure you would like to delete this message?',
@@ -104,7 +133,7 @@ export class InboxComponent implements OnInit {
                 {
                     text: 'Yes',
                     handler: () => {
-                        this.confirmDismiss(card.id);
+                        this.confirmDismiss(card);
                     }
                 }
             ]
@@ -113,11 +142,22 @@ export class InboxComponent implements OnInit {
         await alert.present();
     }
 
-    onCardClick(card: InboxCard) {
-        console.log('Card clicked:', card);
+    private async confirmDismiss(card: BrazeContentCard) {
+        try {
+            // Log dismissal to Braze
+            await this.brazeService.logContentCardDismissed(card.id);
+            
+            // Remove from inbox service
+            this.inboxService.dismissCard(card.id);            
+        } catch (error) {
+            console.error('Error dismissing card:', error);
+            // Remove from local state even if Braze logging fails
+            this.inboxService.dismissCard(card.id);
+        }
     }
 
-    private confirmDismiss(cardId: string) {
-        this.inboxCards = this.inboxCards.filter(card => card.id !== cardId);
+    formatDate(timestamp: number): string {
+        const date = new Date(timestamp * 1000); // Convert from seconds to milliseconds
+        return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     }
 }
