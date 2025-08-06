@@ -4,13 +4,14 @@ import { AlertController, ModalController, IonHeader, IonToolbar, IonTitle, IonC
 import { MmCardComponent } from '../mm-card/mm-card.component';
 import { InboxService } from '@services/inbox.service';
 import { BrazeService, BrazeContentCard } from '@services/braze.service';
+import { Router } from '@angular/router';
 
 @Component({
     selector: 'app-inbox',
     template: `
         <ion-header mode="ios" class="ion-no-border">
             <ion-toolbar>
-                <ion-button class="back-btn" (click)="confirmDismissModal()" fill="clear" slot="start">
+                <ion-button class="back-btn" (click)="confirmDismissModal()" [showDeleteButton]="true" (deleteClick)="dismissCard(card)" fill="clear" slot="start">
                     <ion-icon color="dark" name="arrow-back" slot="icon-only"></ion-icon>
                 </ion-button>
 
@@ -33,9 +34,6 @@ import { BrazeService, BrazeContentCard } from '@services/braze.service';
                                     <span class="card-timestamp">{{ formatDate(card.created) }}</span>
                                 </div>
                             </div>
-                            <ion-button fill="clear" class="delete-button" (click)="dismissCard(card); $event.stopPropagation()">
-                                <ion-icon name="close-circle" color="danger"></ion-icon>
-                            </ion-button>
                         </div>
                     </app-mm-card>
                 }
@@ -90,6 +88,7 @@ export class InboxComponent implements OnInit {
     private readonly alertController = inject(AlertController);
     private readonly inboxService = inject(InboxService);
     private readonly brazeService = inject(BrazeService);
+    private readonly router = inject(Router);
 
     // Use inbox service signals
     inboxCards = this.inboxService.cards;
@@ -105,13 +104,7 @@ export class InboxComponent implements OnInit {
         // Log impression to Braze
         try {
             await this.brazeService.logContentCardImpression(card.id);
-            
-            // If card has URL, handle click
-            if (card.url) {
-                await this.brazeService.logContentCardClicked(card.id);
-                // You can add navigation logic here if needed
-                console.log('Would navigate to:', card.url);
-            }
+            this.router.navigate(['/complete']);
         } catch (error) {
             console.error('Error logging card interaction:', error);
         }
