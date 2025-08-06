@@ -3,6 +3,7 @@ import { HeaderComponent } from '@components/header/header.component';
 import { MmCardComponent } from '@components/mm-card/mm-card.component';
 import { IonHeader, IonContent, IonButton } from '@ionic/angular/standalone';
 import { BrazeService } from '@services/braze.service';
+import { PushNotificationService } from '@services/push-notification.service';
 
 @Component({
   selector: 'app-home',
@@ -29,17 +30,21 @@ import { BrazeService } from '@services/braze.service';
 })
 export class HomePage {
   private readonly brazeService = inject(BrazeService);
+  private readonly pushNotificationService = inject(PushNotificationService);
+
+  constructor() {
+    // Initialize Braze and push notifications as soon as HomePage loads
+    this.pushNotificationService.init();
+  }
 
   async sendInboxTestEvent(): Promise<void> {
     try {
       console.log('Sending INBOX_MESSAGE_TEST event to Braze...');
-      
       await this.brazeService.logCustomEvent('INBOX_MESSAGE_TEST', {
         timestamp: new Date().toISOString(),
         source: 'homepage'
       });
-      
-      console.log('INBOX_MESSAGE_TEST event sent successfully');      
+      console.log('INBOX_MESSAGE_TEST event sent successfully');
     } catch (error) {
       console.error('Error sending test event:', error);
     }
