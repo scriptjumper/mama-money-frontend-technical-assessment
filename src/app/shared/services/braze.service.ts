@@ -1,7 +1,5 @@
 import { Injectable } from '@angular/core';
 
-declare var BrazePlugin: any;
-
 export interface BrazeContentCard {
   id: string;
   title?: string;
@@ -33,7 +31,9 @@ export class BrazeService {
    */
   async initialize(): Promise<void> {
     return new Promise((resolve, reject) => {
-      if (typeof BrazePlugin === 'undefined') {
+      const plugin = (window as any).cordova?.plugins?.brazePlugin;
+      
+      if (!plugin) {
         console.log('BrazePlugin not available - running in browser?');
         resolve();
         return;
@@ -54,36 +54,53 @@ export class BrazeService {
    * Log a custom event to Braze
    */
   async logCustomEvent(eventName: string, properties?: { [key: string]: any }): Promise<void> {
-    if (typeof BrazePlugin === 'undefined') {
-      console.log('BrazePlugin not available - event:', eventName);
-      return;
-    }
+    return new Promise((resolve, reject) => {
+      const plugin = (window as any).cordova?.plugins?.brazePlugin;
+      
+      if (!plugin) {
+        console.log('BrazePlugin not available - event:', eventName);
+        resolve();
+        return;
+      }
 
-    try {
-      console.log('Logging custom event to Braze:', eventName, properties);
-      
-      // The Braze Cordova SDK doesn't use callbacks for logCustomEvent
-      BrazePlugin.logCustomEvent(eventName, properties || {});
-      
-      console.log('Braze custom event sent:', eventName);
-    } catch (error) {
-      console.error('Error logging custom event:', error);
-      throw error;
-    }
+      try {
+        console.log('Logging custom event to Braze:', eventName, properties);
+        
+        plugin.logCustomEvent(
+          eventName,
+          properties || {},
+          () => {
+            console.log('Braze custom event sent successfully:', eventName);
+            // Request immediate data flush to ensure event is sent
+            plugin.requestImmediateDataFlush();
+            resolve();
+          },
+          (error: any) => {
+            console.error('Error logging custom event:', error);
+            reject(error);
+          }
+        );
+      } catch (error) {
+        console.error('Error logging custom event:', error);
+        reject(error);
+      }
+    });
   }
 
   /**
    * Request fresh content cards from Braze
    */
   async requestContentCardsRefresh(): Promise<void> {
-    if (typeof BrazePlugin === 'undefined') {
+    const plugin = (window as any).cordova?.plugins?.brazePlugin;
+    
+    if (!plugin) {
       console.log('BrazePlugin not available - request content cards refresh');
       return;
     }
 
     try {
       console.log('Requesting content cards refresh from Braze...');
-      BrazePlugin.requestContentCardsRefresh();
+      plugin.requestContentCardsRefresh();
       console.log('Content cards refresh requested');
     } catch (error) {
       console.error('Error requesting content cards refresh:', error);
@@ -96,7 +113,9 @@ export class BrazeService {
    */
   async getContentCards(): Promise<BrazeContentCard[]> {
     return new Promise((resolve, reject) => {
-      if (typeof BrazePlugin === 'undefined') {
+      const plugin = (window as any).cordova?.plugins?.brazePlugin;
+      
+      if (!plugin) {
         console.log('BrazePlugin not available - returning empty content cards');
         resolve([]);
         return;
@@ -104,7 +123,7 @@ export class BrazeService {
 
       try {
         console.log('Getting content cards from Braze cache...');
-        BrazePlugin.getContentCardsFromCache(
+        plugin.getContentCardsFromCache(
           (contentCards: BrazeContentCard[]) => {
             console.log('Retrieved content cards from cache:', contentCards?.length || 0);
             resolve(contentCards || []);
@@ -125,14 +144,16 @@ export class BrazeService {
    * Log content card impression
    */
   async logContentCardImpression(cardId: string): Promise<void> {
-    if (typeof BrazePlugin === 'undefined') {
+    const plugin = (window as any).cordova?.plugins?.brazePlugin;
+    
+    if (!plugin) {
       console.log('BrazePlugin not available for card:', cardId);
       return;
     }
 
     try {
       console.log('Content card impression:', cardId);
-      BrazePlugin.logContentCardImpression(cardId);
+      plugin.logContentCardImpression(cardId);
       console.log('Content card impression logged');
     } catch (error) {
       console.error('Error logging content card impression:', error);
@@ -144,14 +165,16 @@ export class BrazeService {
    * Log content card click
    */
   async logContentCardClicked(cardId: string): Promise<void> {
-    if (typeof BrazePlugin === 'undefined') {
+    const plugin = (window as any).cordova?.plugins?.brazePlugin;
+    
+    if (!plugin) {
       console.log('BrazePlugin not available - card:', cardId);
       return;
     }
 
     try {
       console.log('Logging content card click:', cardId);
-      BrazePlugin.logContentCardClicked(cardId);
+      plugin.logContentCardClicked(cardId);
       console.log('Content card click logged');
     } catch (error) {
       console.error('Error logging content card click:', error);
@@ -163,14 +186,16 @@ export class BrazeService {
    * Log content card dismissal
    */
   async logContentCardDismissed(cardId: string): Promise<void> {
-    if (typeof BrazePlugin === 'undefined') {
+    const plugin = (window as any).cordova?.plugins?.brazePlugin;
+    
+    if (!plugin) {
       console.log('BrazePlugin not available - log dismissal for card:', cardId);
       return;
     }
 
     try {
       console.log('Logging content card dismissal:', cardId);
-      BrazePlugin.logContentCardDismissed(cardId);
+      plugin.logContentCardDismissed(cardId);
       console.log('Content card dismissal logged');
     } catch (error) {
       console.error('Error logging content card dismissal:', error);
